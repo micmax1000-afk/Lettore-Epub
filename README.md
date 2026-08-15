@@ -1,10 +1,10 @@
 # 📖 EPUB Reader
 
-Web app leggera e open source per leggere file **EPUB** direttamente nel browser.  
+Web app / PWA per leggere file **EPUB** direttamente nel browser o come app Android.  
 Nessun server, nessuna registrazione, privacy totale.
 
-**Demo live** (dopo il deploy su GitHub Pages):  
-`https://TUO-USERNAME.github.io/epub-reader/`
+**Demo:** `https://TUO-USERNAME.github.io/epub-reader/`  
+(sostituisci con il tuo URL GitHub Pages)
 
 ---
 
@@ -12,86 +12,104 @@ Nessun server, nessuna registrazione, privacy totale.
 
 - Caricamento file `.epub` (pulsante o drag & drop)
 - Sommario (TOC) navigabile
-- Navigazione a pagine (click, frecce, swipe)
+- Navigazione ottimizzata (scorrimento su mobile, pagine su desktop)
 - Controllo dimensione del testo
 - Tema chiaro / scuro
-- Salvataggio automatico della posizione di lettura (localStorage)
-- Responsive (funziona bene su desktop e mobile)
-- Completamente client-side (usa [epub.js](https://github.com/futurepress/epub.js))
+- Salvataggio automatico della posizione di lettura
+- **PWA installabile** (Android / desktop)
+- Completamente client-side ([epub.js](https://github.com/futurepress/epub.js))
 
 ---
 
-## 🚀 Pubblicare su GitHub Pages
+## 📁 Struttura file
 
-1. Crea un nuovo repository su GitHub (es. `epub-reader`)
-2. Carica tutti i file di questa cartella:
-   ```
-   index.html
-   css/style.css
-   js/app.js
-   README.md
-   ```
-3. Vai su **Settings → Pages**
-4. Seleziona branch `main` (o `master`) e cartella `/ (root)`
-5. Salva. Tra qualche minuto l’app sarà online all’indirizzo:
+```
+epub-reader/
+├── index.html
+├── manifest.json          ← PWA manifest
+├── sw.js                  ← Service Worker
+├── css/style.css
+├── js/app.js
+├── icons/
+│   ├── icon-72.png … icon-512.png
+│   ├── icon-maskable-192.png
+│   └── icon-maskable-512.png
+└── README.md
+```
+
+---
+
+## 🚀 1. Pubblicare su GitHub Pages
+
+1. Crea un repository (es. `epub-reader`)
+2. Carica **tutti** i file di questa cartella
+3. **Settings → Pages** → branch `main`, cartella `/ (root)`
+4. Attendi 1–2 minuti. URL tipico:
    ```
    https://TUO-USERNAME.github.io/epub-reader/
    ```
 
-### Metodo rapido con Git
+---
 
-```bash
-git init
-git add .
-git commit -m "Primo commit: EPUB Reader"
-git branch -M main
-git remote add origin https://github.com/TUO-USERNAME/epub-reader.git
-git push -u origin main
-```
+## 📱 2. Creare l’APK con PWABuilder
 
-Poi attiva GitHub Pages come descritto sopra.
+1. Assicurati che il sito sia online su **HTTPS** (GitHub Pages va bene)
+2. Vai su **[https://www.pwabuilder.com](https://www.pwabuilder.com)**
+3. Incolla l’URL della tua app (es. `https://000-afk.github.io/`)
+4. Clicca **Start**
+5. Se tutto è a posto vedrai il report verde (manifest + service worker + icone)
+6. Nella sezione **Package for stores** scegli **Android**
+7. Opzioni consigliate:
+   - Package ID: `com.tuonome.epubreader` (modifica a piacere)
+   - App name: `EPUB Reader`
+   - Hosting: **None** (o lascia default)
+   - Signing: usa la chiave generata da PWABuilder (per test) oppure la tua
+8. Clicca **Generate** / **Download**
+9. Scarichi un ZIP con:
+   - `app-release-signed.apk` (o simile) → installabile sul telefono
+   - progetto Android / bundle per Play Store
+
+### Installare l’APK sul telefono
+
+1. Trasferisci l’APK sul telefono
+2. Abilita “Origini sconosciute” / installazione da file
+3. Apri l’APK e installa
 
 ---
 
-## 🖥️ Uso locale
+## ✅ Checklist PWABuilder
 
-Apri semplicemente `index.html` con un server locale (necessario per alcune funzionalità dei browser):
+L’app include già:
 
-```bash
-# Python
-python -m http.server 8000
+| Requisito              | File / valore                          |
+|------------------------|----------------------------------------|
+| Manifest               | `manifest.json`                        |
+| Service Worker         | `sw.js`                                |
+| Icone 192 & 512        | `icons/icon-192.png`, `icon-512.png`   |
+| Icone maskable         | `icons/icon-maskable-*.png`            |
+| `display: standalone`  | sì                                     |
+| `theme_color`          | `#1a1a2e`                              |
+| HTTPS                  | fornito da GitHub Pages                |
 
-# oppure Node
-npx serve .
-```
+Se PWABuilder segnala problemi:
 
-Poi vai su `http://localhost:8000`
-
----
-
-## ⌨️ Scorciatoie da tastiera
-
-| Tasto          | Azione                  |
-|----------------|-------------------------|
-| ← / →          | Pagina precedente / successiva |
-| + / −          | Ingrandisci / riduci testo |
-| T              | Cambia tema             |
-| Esc            | Chiudi sommario         |
+- Controlla che l’URL termini correttamente (con o senza trailing slash)
+- Forza un hard refresh dopo il deploy
+- Apri `https://TUO-URL/manifest.json` e `https://TUO-URL/sw.js` nel browser per verificare che siano raggiungibili
 
 ---
 
-## 🛠️ Tecnologie
+## ⌨️ Scorciatoie (desktop)
 
-- [epub.js](https://github.com/futurepress/epub.js) – rendering EPUB
-- [JSZip](https://stuk.github.io/jszip/) – gestione archivi
-- HTML / CSS / JavaScript vanilla (zero framework)
+| Tasto   | Azione                         |
+|---------|--------------------------------|
+| ← →     | Pagina precedente / successiva |
+| + −     | Dimensione testo               |
+| T       | Cambia tema                    |
+| Esc     | Chiude sommario                |
 
 ---
 
 ## 📄 Licenza
 
 MIT – usa, modifica e distribuisci liberamente.
-
----
-
-Fatto con ❤️ per chi ama leggere.
