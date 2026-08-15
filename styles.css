@@ -1,0 +1,147 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f5f5f0;
+    color: #222;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+    background: white;
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    background: #2c3e50;
+    color: white;
+    flex-shrink: 0;
+}
+
+header h1 {
+    font-size: 1.4rem;
+    font-weight: 400;
+}
+
+.btn {
+    background: #3498db;
+    color: white;
+    padding: 8px 18px;
+    border-radius: 30px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+    display: inline-block;
+}
+
+.btn:hover {
+    background: #2980b9;
+}
+
+#file-input {
+    display: none;
+}
+
+#controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 24px;
+    background: #ecf0f1;
+    border-bottom: 1px solid #ddd;
+    flex-shrink: 0;
+}
+
+#controls button {
+    background: #34495e;
+    color: white;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#controls button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+#controls button:hover:not(:disabled) {
+    background: #2c3e50;
+}
+
+#progress {
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+#viewer {
+    flex: 1;
+    overflow: auto;
+    background: #fafaf8;
+    padding: 20px 30px;
+    line-height: 1.7;
+    font-size: 1.1rem;
+}
+
+/* Stile per il rendering EPUB.js */
+#viewer iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+#toc-panel {
+    max-height: 200px;
+    overflow-y: auto;
+    background: #f8f9fa;
+    border-top: 1px solid #ddd;
+    padding: 10px 24px;
+    flex-shrink: 0;
+}
+
+#toc-panel h3 {
+    font-size: 1rem;
+    margin-bottom: 6px;
+    color: #2c3e50;
+}
+
+#toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#toc-list li {
+    padding: 4px 0;
+    cursor: pointer;
+    color: #2980b9;
+    font-size: 0.9rem;
+}
+
+#toc-list li:hover {
+    text-decoration: underline;
+}
+
+#toc-list li.active {
+    font-weight: 600;
+    color: #1a5276;
+}
