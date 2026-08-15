@@ -42,20 +42,16 @@ header h1 {
 .btn {
     background: #3498db;
     color: white;
-    padding: 8px 18px;
+    padding: 8px 20px;
     border-radius: 30px;
-    cursor: pointer;
+    border: none;
     font-size: 0.9rem;
+    cursor: pointer;
     transition: background 0.2s;
-    user-select: none;
 }
 
 .btn:hover {
     background: #2980b9;
-}
-
-#file-input {
-    display: none;
 }
 
 #controls {
@@ -93,7 +89,6 @@ header h1 {
     font-weight: 500;
 }
 
-/* Stato */
 #status {
     padding: 6px 20px;
     background: #f8f9fa;
@@ -103,17 +98,17 @@ header h1 {
     display: flex;
     align-items: center;
     flex-shrink: 0;
+    word-break: break-word;
 }
 #status.error { color: #c0392b; background: #fadbd8; }
 #status.ok { color: #27ae60; background: #d5f5e3; }
 #status.info { color: #2980b9; background: #d6eaf8; }
+#status.debug { color: #7f8c8d; background: #ebf5fb; font-family: monospace; font-size: 0.8rem; }
 
-/* Viewer */
 #viewer {
     flex: 1;
     overflow: auto;
     background: #fafaf8;
-    padding: 0;
     min-height: 200px;
 }
 
@@ -123,7 +118,6 @@ header h1 {
     border: none;
 }
 
-/* TOC */
 #toc-panel {
     max-height: 180px;
     overflow-y: auto;
