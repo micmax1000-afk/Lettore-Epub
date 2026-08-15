@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const viewer = document.getElementById('viewer');
     const fileInput = document.getElementById('file-input');
     const openBtn = document.getElementById('openFileBtn');
-    const testBtn = document.getElementById('testBtn');
     const prevBtn = document.getElementById('prev');
     const nextBtn = document.getElementById('next');
     const progressSpan = document.getElementById('progress');
@@ -45,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setStatus('✅ EPUB.js caricato', 'ok');
     }
 
-    // ========== APERTURA FILE (con drag & drop) ==========
+    // ========== APERTURA FILE ==========
     openBtn.addEventListener('click', function() {
         console.log('🖱️ Click su Carica EPUB');
         fileInput.click();
@@ -59,26 +58,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         console.log('📂 FILE SELEZIONATO:', file.name, file.size);
-        setStatus('📂 ' + file.name + ' (' + file.size + ' bytes)', 'debug');
+        setStatus('📂 ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)', 'debug');
 
         if (!file.name.toLowerCase().endsWith('.epub')) {
             setStatus('❌ Deve essere .epub', 'error');
             return;
         }
 
-        // === METODO ALTERNATIVO: Leggi come testo per debug ===
+        // SE FILE TROPPO GRANDE (> 20MB), avvisa
+        if (file.size > 20 * 1024 * 1024) {
+            setStatus('⚠️ File grande (' + (file.size / 1024 / 1024).toFixed(1) + ' MB), potrebbe richiedere tempo', 'info');
+        }
+
         const reader = new FileReader();
         reader.onload = function(ev) {
             try {
                 const arrayBuffer = ev.target.result;
                 console.log('✅ ArrayBuffer letto:', arrayBuffer.byteLength);
-                setStatus('✅ Letto ' + arrayBuffer.byteLength + ' bytes', 'info');
+                setStatus('✅ Letto ' + (arrayBuffer.byteLength / 1024 / 1024).toFixed(2) + ' MB', 'info');
                 
                 const blob = new Blob([arrayBuffer], { type: 'application/epub+zip' });
                 const url = URL.createObjectURL(blob);
                 console.log('🔗 URL creato:', url);
                 
-                // Prova ad aprire
                 openBook(url);
             } catch (err) {
                 console.error('❌ Errore:', err);
@@ -93,17 +95,10 @@ document.addEventListener('DOMContentLoaded', function() {
         this.value = '';
     });
 
-    // ========== PULSANTE TEST (Moby Dick) ==========
-    testBtn.addEventListener('click', function() {
-        console.log('🧪 Test con Moby Dick');
-        setStatus('🧪 Caricamento Moby Dick...', 'info');
-        openBook('https://s3.amazonaws.com/epubjs/books/moby-dick.epub');
-    });
-
-    // ========== APERTURA EPUB ==========
+    // ========== APERTURA EPUB (OTTIMIZZATA) ==========
     function openBook(url) {
         console.log('🚀 openBook() URL:', url.substring(0, 60) + '...');
-        setStatus('⏳ Caricamento EPUB...', 'info');
+        setStatus('⏳ Caricamento EPUB... (potrebbe richiedere tempo)', 'info');
 
         if (book) {
             try { book.destroy(); } catch(e) {}
@@ -113,8 +108,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
-            console.log('📖 Creazione book...');
-            book = ePub(url, { openAs: 'epub' });
+            // === CONFIGURAZIONE PER RIDURRE LA MEMORIA ===
+            console.log('📖 Creazione book con ottimizzazioni...');
+            book = ePub(url, {
+                openAs: 'epub',
+                // Carica solo i metadati iniziali
+                requests: {
+                    // Limita le richieste contemporanee
+                    concurrent: 1
+                }
+            });
             console.log('✅ Book creato');
 
             console.log('🎨 Creazione rendition...');
@@ -122,31 +125,47 @@ document.addEventListener('DOMContentLoaded', function() {
                 width: '100%',
                 height: '100%',
                 spread: 'none',
-                flow: 'paginated'
+                flow: 'paginated',
+                // Riduci la qualità per risparmiare memoria
+                image: {
+                    quality: 0.7
+                },
+                // Layout più semplice
+                manager: 'continuous'
             });
             console.log('✅ Rendition creata');
 
-            // === TIMEOUT PER DEBUG ===
-            const timeoutId = setTimeout(() => {
-                setStatus('⏳ Ancora in caricamento...', 'info');
-            }, 3000);
+            // === MOSTRA PROGRESSO DI CARICAMENTO ===
+            let loadingStart = Date.now();
+            const loadingInterval = setInterval(() => {
+                const elapsed = Math.round((Date.now() - loadingStart) / 1000);
+                setStatus('⏳ Caricamento in corso... ' + elapsed + 's', 'info');
+            }, 5000);
 
             console.log('📄 Chiamata rendition.display()...');
             rendition.display()
                 .then(() => {
-                    clearTimeout(timeoutId);
+                    clearInterval(loadingInterval);
                     console.log('✅ display() COMPLETATO!');
                     setStatus('✅ Pronto', 'ok');
                     prevBtn.disabled = false;
                     nextBtn.disabled = false;
-                    loadToc();
+                    
+                    // Carica indice (dopo un po')
+                    setTimeout(() => loadToc(), 500);
                     updateProgress();
                     restorePosition();
                 })
                 .catch(err => {
-                    clearTimeout(timeoutId);
+                    clearInterval(loadingInterval);
                     console.error('❌ display() fallito:', err);
-                    setStatus('❌ Errore display: ' + err.message, 'error');
+                    
+                    // Gestione specifica per "out of memory"
+                    if (err.message && err.message.includes('memory')) {
+                        setStatus('❌ Memoria insufficiente. Prova un EPUB più piccolo o usa un browser desktop', 'error');
+                    } else {
+                        setStatus('❌ Errore display: ' + err.message, 'error');
+                    }
                 });
 
             // Eventi
@@ -154,6 +173,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('📄 Rendered:', section);
                 updateProgress();
                 savePosition();
+                // Libera memoria forzando il garbage collector (se disponibile)
+                if (window.gc) { try { window.gc(); } catch(e) {} }
             });
 
             rendition.on('locationChanged', function() {
@@ -232,30 +253,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function loadToc() {
         if (!book) return;
-        book.ready.then(() => book.navigation)
-            .then(nav => {
-                tocList.innerHTML = '';
-                if (!nav || !nav.toc || nav.toc.length === 0) {
-                    tocList.innerHTML = '<li style="color:#888;font-style:italic;">Nessun indice</li>';
-                    return;
-                }
-                nav.toc.forEach(item => {
-                    const li = document.createElement('li');
-                    li.textContent = item.label;
-                    li.dataset.href = item.href;
-                    li.addEventListener('click', function() {
-                        if (rendition) {
-                            rendition.display(this.dataset.href).catch(() => {});
-                        }
-                    });
-                    tocList.appendChild(li);
+        console.log('📑 Caricamento indice...');
+        book.ready.then(() => {
+            return book.navigation;
+        }).then(nav => {
+            tocList.innerHTML = '';
+            if (!nav || !nav.toc || nav.toc.length === 0) {
+                tocList.innerHTML = '<li style="color:#888;font-style:italic;">Nessun indice</li>';
+                return;
+            }
+            nav.toc.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item.label;
+                li.dataset.href = item.href;
+                li.addEventListener('click', function() {
+                    if (rendition) {
+                        rendition.display(this.dataset.href).catch(() => {});
+                    }
                 });
-                console.log('📑 TOC caricato:', nav.toc.length, 'elementi');
-            })
-            .catch(err => {
-                console.warn('Indice non disponibile:', err);
-                tocList.innerHTML = '<li style="color:#888;font-style:italic;">Indice non disponibile</li>';
+                tocList.appendChild(li);
             });
+            console.log('📑 TOC caricato:', nav.toc.length, 'elementi');
+        }).catch(err => {
+            console.warn('Indice non disponibile:', err);
+            tocList.innerHTML = '<li style="color:#888;font-style:italic;">Indice non disponibile</li>';
+        });
     }
 
     // Drag & drop
@@ -269,12 +291,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    setStatus('📂 Pronto, carica un EPUB o clicca "Test Moby Dick"', 'info');
-
-    // === CARICAMENTO AUTOMATICO DI TEST (dopo 2 secondi) ===
-    setTimeout(function() {
-        console.log('🧪 Avvio test automatico con Moby Dick...');
-        setStatus('🧪 Test automatico Moby Dick...', 'info');
-        openBook('https://s3.amazonaws.com/epubjs/books/moby-dick.epub');
-    }, 1500);
+    setStatus('📂 Pronto, carica un EPUB', 'info');
 });
