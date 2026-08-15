@@ -97,20 +97,24 @@
           renderToc(nav.toc);
         })
         .then(() => {
-          // Render
+          // Render – paginated works better with explicit size & no spread on mobile
+          const isMobile = window.matchMedia("(max-width: 768px)").matches;
+
           rendition = book.renderTo("viewer", {
             width: "100%",
             height: "100%",
             flow: "paginated",
             manager: "default",
+            spread: "none",
             allowScriptedContent: true,
           });
 
           // Themes
           rendition.themes.default({
             body: {
-              "padding": "20px !important",
-              "line-height": "1.6 !important",
+              "padding": "16px 20px !important",
+              "line-height": "1.65 !important",
+              "margin": "0 !important",
             },
           });
 
@@ -125,6 +129,9 @@
           showLoading(false);
           showReader(true);
           updateLocation();
+
+          // Generate locations for progress %
+          generateLocations();
         })
         .catch((err) => {
           console.error(err);
@@ -139,6 +146,25 @@
           localStorage.setItem(bookKey, currentCfi);
           updateLocation(location);
           highlightToc(location.start.href);
+        });
+
+        // Click / tap inside the book (iframe) – left half = prev, right half = next
+        rendition.on("click", (e) => {
+          // Ignore clicks on links
+          if (e.target && (e.target.tagName === "A" || e.target.closest("a"))) return;
+
+          const iframe = viewer.querySelector("iframe");
+          if (!iframe) return;
+          const rect = iframe.getBoundingClientRect();
+          const x = e.clientX ?? (e.detail && e.detail.clientX);
+          if (x == null) return;
+
+          const relativeX = x - rect.left;
+          if (relativeX < rect.width * 0.3) {
+            goPrev();
+          } else if (relativeX > rect.width * 0.7) {
+            goNext();
+          }
         });
 
         // Keyboard
@@ -187,29 +213,48 @@
   // ---------- Location & progress ----------
   function updateLocation(location) {
     if (!location && rendition) {
-      location = rendition.currentLocation();
+      try {
+        location = rendition.currentLocation();
+      } catch (_) {
+        return;
+      }
     }
     if (!location || !location.start) return;
 
     const page = location.start.displayed?.page || 0;
     const total = location.start.displayed?.total || 0;
-    const percentage = book.locations && book.locations.length
-      ? Math.round(book.locations.percentageFromCfi(location.start.cfi) * 100)
-      : (total ? Math.round((page / total) * 100) : 0);
 
-    locationInfo.textContent = total
-      ? `Pagina ${page} di ${total}`
-      : `${percentage}%`;
+    let percentage = 0;
+    if (book.locations && book.locations.length()) {
+      try {
+        percentage = Math.round(book.locations.percentageFromCfi(location.start.cfi) * 100);
+      } catch (_) {
+        percentage = total ? Math.round((page / total) * 100) : 0;
+      }
+    } else if (total) {
+      percentage = Math.round((page / total) * 100);
+    }
 
-    progressBar.style.width = `${percentage}%`;
+    if (total > 1) {
+      locationInfo.textContent = `${page} / ${total}`;
+    } else if (percentage > 0) {
+      locationInfo.textContent = `${percentage}%`;
+    } else {
+      locationInfo.textContent = "—";
+    }
+
+    progressBar.style.width = `${Math.min(100, Math.max(0, percentage))}%`;
   }
 
   // Generate locations for better progress (async)
   function generateLocations() {
-    if (!book || book.locations.length) return;
-    book.locations.generate(1024).then(() => {
-      updateLocation();
-    });
+    if (!book) return;
+    try {
+      if (book.locations && book.locations.length && book.locations.length()) return;
+      book.locations.generate(1600).then(() => {
+        updateLocation();
+      }).catch(() => {});
+    } catch (_) {}
   }
 
   // ---------- Font & Theme ----------
@@ -271,8 +316,10 @@
   $("#btn-open").addEventListener("click", () => fileInput.click());
   $("#btn-toc").addEventListener("click", () => toggleSidebar());
   $("#btn-close-toc").addEventListener("click", () => toggleSidebar(false));
-  $("#btn-prev").addEventListener("click", goPrev);
-  $("#btn-next").addEventListener("click", goNext);
+  $("#btn-prev").addEventListener("click", (e) => { e.preventDefault(); goPrev(); });
+  $("#btn-next").addEventListener("click", (e) => { e.preventDefault(); goNext(); });
+  $("#btn-prev-mobile").addEventListener("click", (e) => { e.preventDefault(); goPrev(); });
+  $("#btn-next-mobile").addEventListener("click", (e) => { e.preventDefault(); goNext(); });
   $("#btn-font-inc").addEventListener("click", () => changeFontSize(10));
   $("#btn-font-dec").addEventListener("click", () => changeFontSize(-10));
   $("#btn-theme").addEventListener("click", toggleTheme);
@@ -306,23 +353,38 @@
     if (file) loadFile(file);
   });
 
-  // Touch swipe (basic)
+  // Swipe navigation on the viewer wrapper (works outside iframe)
   let touchStartX = 0;
-  viewer.addEventListener("touchstart", (e) => {
+  let touchStartY = 0;
+  const wrapper = document.querySelector(".viewer-wrapper");
+
+  wrapper.addEventListener("touchstart", (e) => {
     touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
   }, { passive: true });
 
-  viewer.addEventListener("touchend", (e) => {
-    const diff = e.changedTouches[0].screenX - touchStartX;
-    if (Math.abs(diff) > 60) {
-      if (diff > 0) goPrev();
+  wrapper.addEventListener("touchend", (e) => {
+    const dx = e.changedTouches[0].screenX - touchStartX;
+    const dy = e.changedTouches[0].screenY - touchStartY;
+    // Horizontal swipe only (ignore vertical scroll-ish gestures)
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx > 0) goPrev();
       else goNext();
     }
   }, { passive: true });
 
-  // After first display, generate locations for better % progress
-  // (done lazily after book is ready)
-  setTimeout(() => {
-    if (book) generateLocations();
-  }, 2000);
+  // Also capture swipe from the overlay buttons area
+  document.querySelector(".nav-overlay").addEventListener("touchstart", (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+  }, { passive: true });
+
+  document.querySelector(".nav-overlay").addEventListener("touchend", (e) => {
+    const dx = e.changedTouches[0].screenX - touchStartX;
+    const dy = e.changedTouches[0].screenY - touchStartY;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx > 0) goPrev();
+      else goNext();
+    }
+  }, { passive: true });
 })();
