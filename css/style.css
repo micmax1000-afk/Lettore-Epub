@@ -8,7 +8,7 @@
   --accent-hover: #1e3f73;
   --border: #e0ddd5;
   --toolbar-h: 52px;
-  --status-h: 36px;
+  --status-h: 48px;
   --sidebar-w: 280px;
   --radius: 10px;
   --shadow: 0 4px 20px rgba(0,0,0,0.08);
@@ -277,7 +277,7 @@ html, body {
   border: none !important;
 }
 
-/* Navigation overlay */
+/* Navigation overlay (tap zones) */
 .nav-overlay {
   position: absolute;
   inset: 0;
@@ -285,11 +285,12 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: stretch;
+  z-index: 5;
 }
 
 .nav-btn {
-  width: 22%;
-  max-width: 120px;
+  width: 30%;
+  max-width: 140px;
   background: transparent;
   border: none;
   color: transparent;
@@ -300,10 +301,12 @@ html, body {
   align-items: center;
   justify-content: center;
   transition: background 0.2s, color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-.nav-btn:hover {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+.nav-btn:active {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
   color: var(--accent);
 }
 
@@ -312,16 +315,37 @@ html, body {
 
 /* Status bar */
 .status-bar {
-  height: var(--status-h);
+  height: 48px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 16px;
+  gap: 8px;
+  padding: 0 8px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
   font-size: 0.8rem;
   color: var(--text-muted);
   flex-shrink: 0;
+  z-index: 20;
+}
+
+.btn-nav-mobile {
+  flex-shrink: 0;
+  background: var(--border);
+  border: none;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  min-width: 72px;
+}
+
+.btn-nav-mobile:active {
+  background: var(--accent);
+  color: #fff;
 }
 
 .progress-bar {
@@ -330,6 +354,7 @@ html, body {
   background: var(--border);
   border-radius: 2px;
   overflow: hidden;
+  min-width: 40px;
 }
 
 .progress {
@@ -338,6 +363,13 @@ html, body {
   background: var(--accent);
   border-radius: 2px;
   transition: width 0.3s ease;
+}
+
+#location-info {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  min-width: 4.5em;
+  text-align: center;
 }
 
 /* Loading */
@@ -399,4 +431,4 @@ body.dragover .welcome {
     transition: none !important;
     animation: none !important;
   }
-  }
+}
