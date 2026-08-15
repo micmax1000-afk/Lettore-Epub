@@ -11,7 +11,6 @@
         <header>
             <h1>📖 EPUB Reader</h1>
             <button id="openFileBtn" class="btn">📂 Carica EPUB</button>
-            <button id="testBtn" class="btn" style="background:#e67e22;">🧪 Test Moby Dick</button>
             <input type="file" id="file-input" accept=".epub" style="display:none;">
         </header>
 
@@ -21,7 +20,7 @@
             <button id="next" disabled>Successiva ▶</button>
         </div>
 
-        <div id="status">📂 Pronto</div>
+        <div id="status">📂 Clicca "Carica EPUB" per selezionare un file</div>
 
         <div id="viewer"></div>
 
@@ -33,7 +32,7 @@
         </div>
     </div>
 
-    <!-- EPUB.js da CDN (più recente) -->
+    <!-- EPUB.js da CDN -->
     <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
     <script src="app.js"></script>
 </body>
