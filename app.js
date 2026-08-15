@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const viewer = document.getElementById('viewer');
     const fileInput = document.getElementById('file-input');
+    const openBtn = document.getElementById('openFileBtn');
     const prevBtn = document.getElementById('prev');
     const nextBtn = document.getElementById('next');
     const progressSpan = document.getElementById('progress');
@@ -19,31 +20,44 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('[STATUS]', msg);
     }
 
-    // ========== CARICAMENTO FILE ==========
-    fileInput.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        console.log('📂 File selezionato:', file.name, file.size, 'bytes');
+    // ========== APERTURA FILE PICKER ==========
+    // Il pulsante apre il file input
+    openBtn.addEventListener('click', function() {
+        fileInput.click();
+    });
 
+    // ========== GESTIONE FILE SELEZIONATO ==========
+    fileInput.addEventListener('change', function(e) {
+        const file = this.files[0];
+        if (!file) {
+            setStatus('⚠️ Nessun file selezionato', 'info');
+            return;
+        }
+
+        setStatus('📂 File: ' + file.name + ' (' + file.size + ' bytes)', 'debug');
+        console.log('📂 File selezionato:', file.name, file.size);
+
+        // Verifica estensione
         if (!file.name.toLowerCase().endsWith('.epub')) {
             setStatus('❌ Il file deve avere estensione .epub', 'error');
             return;
         }
 
-        setStatus('⏳ Lettura del file in corso...', 'info');
-
+        // Leggi il file
         const reader = new FileReader();
         reader.onload = function(ev) {
             try {
                 const arrayBuffer = ev.target.result;
+                setStatus('✅ File letto (' + arrayBuffer.byteLength + ' bytes), apertura EPUB...', 'info');
                 console.log('✅ ArrayBuffer letto, dimensione:', arrayBuffer.byteLength);
+
                 const blob = new Blob([arrayBuffer], { type: 'application/epub+zip' });
                 const url = URL.createObjectURL(blob);
                 console.log('🔗 URL creato:', url);
                 openBook(url);
             } catch (err) {
-                console.error('❌ Errore nella lettura del file:', err);
-                setStatus('❌ Errore lettura: ' + err.message, 'error');
+                console.error('❌ Errore elaborazione:', err);
+                setStatus('❌ Errore: ' + err.message, 'error');
             }
         };
         reader.onerror = function(err) {
@@ -51,15 +65,21 @@ document.addEventListener('DOMContentLoaded', function() {
             setStatus('❌ Errore durante la lettura del file', 'error');
         };
         reader.readAsArrayBuffer(file);
+
+        // Resetta il valore dell'input per permettere di ricaricare lo stesso file
+        this.value = '';
     });
 
     // ========== APERTURA EPUB ==========
     function openBook(url) {
-        setStatus('⏳ Caricamento EPUB in corso...', 'info');
+        setStatus('⏳ Caricamento EPUB...', 'info');
 
+        // Distruggi eventuali istanze precedenti
         if (book) {
             try { book.destroy(); } catch(e) {}
-            if (rendition) { try { rendition.destroy(); } catch(e) {} }
+        }
+        if (rendition) {
+            try { rendition.destroy(); } catch(e) {}
         }
 
         try {
@@ -86,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     restorePosition();
                 })
                 .catch(err => {
-                    console.error('❌ Errore durante display():', err);
+                    console.error('❌ Errore display():', err);
                     setStatus('❌ Errore visualizzazione: ' + err.message, 'error');
                 });
 
@@ -223,10 +243,11 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Messaggio iniziale
-    setStatus('📂 Seleziona un file EPUB o trascinalo qui', 'info');
+    setStatus('📂 Clicca "Carica EPUB" per selezionare un file', 'info');
 
-    // ========== TEST CON EPUB PUBBLICO (scommenta per prova) ==========
+    // ========== TEST CON EPUB PUBBLICO (scommenta per test) ==========
     /*
+    setStatus('⏳ Caricamento EPUB di test...', 'info');
     openBook('https://s3.amazonaws.com/epubjs/books/moby-dick.epub');
     */
 });
