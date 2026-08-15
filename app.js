@@ -1,3 +1,16 @@
+// === DEBUG VISIBILE SU MOBILE ===
+// Qualsiasi errore JavaScript verrà mostrato nella barra di stato
+window.onerror = function(msg, url, line, col, error) {
+    const statusDiv = document.getElementById('status');
+    if (statusDiv) {
+        statusDiv.textContent = '🚨 ERR: ' + msg.substring(0, 80);
+        statusDiv.className = 'status error';
+    }
+    console.error('Global error:', msg, error);
+    return true; // impedisce la visualizzazione dell'errore di default
+};
+
+// === INIZIO APP ===
 document.addEventListener('DOMContentLoaded', function() {
     const viewer = document.getElementById('viewer');
     const fileInput = document.getElementById('file-input');
@@ -21,7 +34,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ========== APERTURA FILE PICKER ==========
-    // Il pulsante apre il file input
     openBtn.addEventListener('click', function() {
         fileInput.click();
     });
@@ -72,7 +84,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ========== APERTURA EPUB ==========
     function openBook(url) {
-        setStatus('⏳ Caricamento EPUB...', 'info');
+        setStatus('⏳ Caricamento EPUB in corso...', 'info');
+        console.log('🚀 openBook() chiamato con URL:', url);
 
         // Distruggi eventuali istanze precedenti
         if (book) {
@@ -83,6 +96,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
+            // Inizializza EPUB.js
             book = ePub(url);
             console.log('📖 EPUB.js inizializzato');
 
@@ -138,7 +152,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         } catch (err) {
             console.error('❌ Errore in openBook:', err);
-            setStatus('❌ Errore: ' + err.message, 'error');
+            setStatus('❌ Errore apertura EPUB: ' + err.message, 'error');
         }
     }
 
@@ -245,9 +259,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Messaggio iniziale
     setStatus('📂 Clicca "Carica EPUB" per selezionare un file', 'info');
 
-    // ========== TEST CON EPUB PUBBLICO (scommenta per test) ==========
+    // ========== TEST CON EPUB PUBBLICO (Moby Dick) ==========
+    // SCOMMENTA LE RIGHE SOTTO PER TESTARE CON UN EPUB GRATUITO
     /*
-    setStatus('⏳ Caricamento EPUB di test...', 'info');
+    setStatus('⏳ Caricamento EPUB di test (Moby Dick)...', 'info');
     openBook('https://s3.amazonaws.com/epubjs/books/moby-dick.epub');
     */
 });
