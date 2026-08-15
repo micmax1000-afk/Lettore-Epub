@@ -97,26 +97,70 @@
           renderToc(nav.toc);
         })
         .then(() => {
-          // Render – paginated works better with explicit size & no spread on mobile
-          const isMobile = window.matchMedia("(max-width: 768px)").matches;
+          // Mobile: vertical scroll (natural on phone)
+          // Desktop: classic paginated pages
+          const isMobile = window.matchMedia("(max-width: 768px)").matches ||
+            ("ontouchstart" in window && window.innerWidth < 1024);
 
-          rendition = book.renderTo("viewer", {
-            width: "100%",
-            height: "100%",
-            flow: "paginated",
-            manager: "default",
-            spread: "none",
-            allowScriptedContent: true,
-          });
+          const renderOptions = isMobile
+            ? {
+                width: "100%",
+                height: "100%",
+                flow: "scrolled-doc",
+                manager: "default",
+                allowScriptedContent: true,
+              }
+            : {
+                width: "100%",
+                height: "100%",
+                flow: "paginated",
+                manager: "default",
+                spread: "none",
+                allowScriptedContent: true,
+              };
 
-          // Themes
+          rendition = book.renderTo("viewer", renderOptions);
+
+          // Strong mobile-friendly styles injected into the book
           rendition.themes.default({
-            body: {
-              "padding": "16px 20px !important",
-              "line-height": "1.65 !important",
+            html: {
               "margin": "0 !important",
+              "padding": "0 !important",
+              "width": "100% !important",
+              "max-width": "100% !important",
+              "overflow-x": "hidden !important",
+            },
+            body: {
+              "margin": "0 auto !important",
+              "padding": isMobile ? "12px 16px 40px !important" : "20px 28px !important",
+              "width": "100% !important",
+              "max-width": "100% !important",
+              "box-sizing": "border-box !important",
+              "line-height": "1.7 !important",
+              "word-wrap": "break-word !important",
+              "overflow-wrap": "break-word !important",
+              "hyphens": "auto !important",
+              "-webkit-hyphens": "auto !important",
+              "overflow-x": "hidden !important",
+            },
+            "p, div, span, li, h1, h2, h3, h4, h5, h6, blockquote": {
+              "max-width": "100% !important",
+              "word-wrap": "break-word !important",
+              "overflow-wrap": "break-word !important",
+              "box-sizing": "border-box !important",
+            },
+            "img, svg, video, table": {
+              "max-width": "100% !important",
+              "height": "auto !important",
+            },
+            "table": {
+              "display": "block !important",
+              "overflow-x": "auto !important",
             },
           });
+
+          // Store mode for navigation UX
+          window.__epubIsMobile = isMobile;
 
           applyFontSize();
           applyThemeToBook();
@@ -129,9 +173,13 @@
           showLoading(false);
           showReader(true);
           updateLocation();
-
-          // Generate locations for progress %
           generateLocations();
+
+          // On mobile scrolled mode, hide side tap zones (user scrolls with finger)
+          if (window.__epubIsMobile) {
+            const overlay = document.querySelector(".nav-overlay");
+            if (overlay) overlay.style.display = "none";
+          }
         })
         .catch((err) => {
           console.error(err);
@@ -148,24 +196,20 @@
           highlightToc(location.start.href);
         });
 
-        // Click / tap inside the book (iframe) – left half = prev, right half = next
-        rendition.on("click", (e) => {
-          // Ignore clicks on links
-          if (e.target && (e.target.tagName === "A" || e.target.closest("a"))) return;
-
-          const iframe = viewer.querySelector("iframe");
-          if (!iframe) return;
-          const rect = iframe.getBoundingClientRect();
-          const x = e.clientX ?? (e.detail && e.detail.clientX);
-          if (x == null) return;
-
-          const relativeX = x - rect.left;
-          if (relativeX < rect.width * 0.3) {
-            goPrev();
-          } else if (relativeX > rect.width * 0.7) {
-            goNext();
-          }
-        });
+        // Desktop: click left/right halves to turn page
+        if (!window.__epubIsMobile) {
+          rendition.on("click", (e) => {
+            if (e.target && (e.target.tagName === "A" || e.target.closest?.("a"))) return;
+            const iframe = viewer.querySelector("iframe");
+            if (!iframe) return;
+            const rect = iframe.getBoundingClientRect();
+            const x = e.clientX ?? e.detail?.clientX;
+            if (x == null) return;
+            const relativeX = x - rect.left;
+            if (relativeX < rect.width * 0.3) goPrev();
+            else if (relativeX > rect.width * 0.7) goNext();
+          });
+        }
 
         // Keyboard
         rendition.on("keyup", handleKey);
