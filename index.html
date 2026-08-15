@@ -1,122 +1,86 @@
 <!DOCTYPE html>
-<html>
+<html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lettore EPUB leggero</title>
-  <style>
-    body { margin:0; display:flex; flex-direction:column; height:100vh; font-family:sans-serif; }
-    #toolbar { padding:10px; background:#2c3e50; color:white; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    #toolbar button { background:#3498db; border:none; color:white; padding:6px 14px; border-radius:20px; cursor:pointer; }
-    #toolbar button:disabled { opacity:0.4; }
-    #viewer { flex:1; overflow:auto; background:#fafaf8; padding:20px; }
-    #status { padding:6px 12px; background:#ecf0f1; font-size:0.9rem; border-bottom:1px solid #ccc; min-height:30px; }
-    .error { background:#fadbd8; color:#c0392b; }
-    .ok { background:#d5f5e3; color:#27ae60; }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="description" content="Lettore EPUB gratuito e open source. Carica e leggi i tuoi ebook direttamente nel browser." />
+  <meta name="theme-color" content="#1a1a2e" />
+  <title>EPUB Reader – Lettore di ebook online</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />
 </head>
 <body>
-  <div id="toolbar">
-    <span style="flex:1;">📖 EPUB Reader</span>
-    <button id="openBtn">📂 Carica EPUB</button>
-    <input type="file" id="fileInput" accept=".epub" style="display:none;">
-    <button id="prevBtn" disabled>◀</button>
-    <span id="progress">0%</span>
-    <button id="nextBtn" disabled>▶</button>
+  <!-- Schermata iniziale -->
+  <div id="welcome" class="welcome">
+    <div class="welcome-content">
+      <div class="logo">📖</div>
+      <h1>EPUB Reader</h1>
+      <p>Carica un file <strong>.epub</strong> per iniziare a leggere</p>
+      <label class="btn btn-primary" for="file-input">
+        Apri ebook
+        <input type="file" id="file-input" accept=".epub,application/epub+zip" hidden />
+      </label>
+      <p class="hint">Oppure trascina il file qui</p>
+      <p class="footer-note">Funziona interamente nel browser · Nessun server · Privacy totale</p>
+    </div>
   </div>
-  <div id="status">📂 Carica un file EPUB</div>
-  <div id="viewer"></div>
 
+  <!-- Interfaccia di lettura -->
+  <div id="reader" class="reader hidden">
+    <!-- Barra superiore -->
+    <header class="toolbar">
+      <button id="btn-toc" class="btn-icon" title="Sommario" aria-label="Sommario">☰</button>
+      <div class="book-info">
+        <span id="book-title">Titolo</span>
+        <span id="book-author" class="author"></span>
+      </div>
+      <div class="controls">
+        <button id="btn-font-dec" class="btn-icon" title="Riduci testo" aria-label="Riduci testo">A−</button>
+        <button id="btn-font-inc" class="btn-icon" title="Ingrandisci testo" aria-label="Ingrandisci testo">A+</button>
+        <button id="btn-theme" class="btn-icon" title="Cambia tema" aria-label="Cambia tema">◐</button>
+        <button id="btn-open" class="btn-icon" title="Apri altro ebook" aria-label="Apri altro ebook">📂</button>
+      </div>
+    </header>
+
+    <!-- Contenuto principale -->
+    <div class="main">
+      <!-- Sidebar TOC -->
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+          <h2>Sommario</h2>
+          <button id="btn-close-toc" class="btn-icon" aria-label="Chiudi">✕</button>
+        </div>
+        <nav id="toc" class="toc"></nav>
+      </aside>
+
+      <!-- Area di lettura -->
+      <div class="viewer-wrapper">
+        <div id="viewer"></div>
+        <div class="nav-overlay">
+          <button id="btn-prev" class="nav-btn prev" title="Pagina precedente" aria-label="Precedente">‹</button>
+          <button id="btn-next" class="nav-btn next" title="Pagina successiva" aria-label="Successiva">›</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Barra inferiore -->
+    <footer class="status-bar">
+      <span id="location-info">—</span>
+      <div class="progress-bar">
+        <div id="progress" class="progress"></div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Overlay di caricamento -->
+  <div id="loading" class="loading hidden">
+    <div class="spinner"></div>
+    <p>Caricamento ebook…</p>
+  </div>
+
+  <!-- Script -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
-  <script>
-    const viewer = document.getElementById('viewer');
-    const status = document.getElementById('status');
-    const openBtn = document.getElementById('openBtn');
-    const fileInput = document.getElementById('fileInput');
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-    const progressSpan = document.getElementById('progress');
-
-    let book, rendition;
-
-    function setStatus(msg, type) {
-      status.textContent = msg;
-      status.className = type || '';
-    }
-
-    openBtn.onclick = () => fileInput.click();
-
-    fileInput.onchange = function(e) {
-      const file = this.files[0];
-      if (!file) return;
-      if (!file.name.endsWith('.epub')) {
-        setStatus('❌ Il file deve essere .epub', 'error');
-        return;
-      }
-      setStatus('⏳ Lettura file...', '');
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const buf = ev.target.result;
-        const blob = new Blob([buf], { type: 'application/epub+zip' });
-        const url = URL.createObjectURL(blob);
-        openBook(url);
-      };
-      reader.readAsArrayBuffer(file);
-      this.value = '';
-    };
-
-    function openBook(url) {
-      setStatus('⏳ Caricamento EPUB...', '');
-      if (book) { try { book.destroy(); } catch(e) {} }
-      if (rendition) { try { rendition.destroy(); } catch(e) {} }
-
-      book = ePub(url, {
-        // Carica solo i metadati, non tutto il contenuto
-        openAs: 'epub',
-        requests: { concurrent: 1 } // una richiesta alla volta
-      });
-
-      rendition = book.renderTo('viewer', {
-        width: '100%',
-        height: '100%',
-        spread: 'none',
-        flow: 'paginated'
-      });
-
-      rendition.display()
-        .then(() => {
-          setStatus('✅ Pronto', 'ok');
-          prevBtn.disabled = false;
-          nextBtn.disabled = false;
-          updateProgress();
-        })
-        .catch(err => {
-          setStatus('❌ Errore: ' + err.message, 'error');
-          console.error(err);
-        });
-
-      rendition.on('rendered', updateProgress);
-      rendition.on('locationChanged', updateProgress);
-
-      prevBtn.onclick = () => rendition.prev();
-      nextBtn.onclick = () => rendition.next();
-
-      // Tasti freccia
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); rendition.next(); }
-        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); rendition.prev(); }
-      });
-    }
-
-    function updateProgress() {
-      try {
-        const loc = rendition.currentLocation();
-        if (loc && loc.start) {
-          const pct = Math.round(loc.start.percentage * 100);
-          progressSpan.textContent = pct + '%';
-        }
-      } catch(e) {}
-    }
-  </script>
+  <script src="js/app.js"></script>
 </body>
 </html>
