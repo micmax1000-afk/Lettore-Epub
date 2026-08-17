@@ -3,103 +3,109 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="description" content="Leggi i tuoi ebook EPUB direttamente nel browser. Privacy totale, nessun server." />
-  <meta name="theme-color" content="#1a1a2e" />
+  <meta name="description" content="Leggi i tuoi ebook EPUB. Libreria, progresso e segnalibri salvati sul dispositivo." />
+  <meta name="theme-color" content="#121212" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="EPUB Reader" />
-  <title>EPUB Reader – Lettore di ebook online</title>
-
-  <!-- PWA -->
+  <title>EPUB Reader</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
-
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <!-- Schermata iniziale -->
-  <div id="welcome" class="welcome">
-    <div class="welcome-content">
-      <div class="logo">📖</div>
-      <h1>EPUB Reader</h1>
-      <p>Carica un file <strong>.epub</strong> per iniziare a leggere</p>
-      <label class="btn btn-primary" for="file-input">
-        Apri ebook
-        <input type="file" id="file-input" accept=".epub,application/epub+zip" hidden />
-      </label>
-      <p class="hint">Oppure trascina il file qui</p>
-      <p class="footer-note">Funziona interamente nel browser · Nessun server · Privacy totale</p>
+  <!-- LIBRERIA -->
+  <div id="library" class="library">
+    <header class="lib-header">
+      <h1>I miei libri</h1>
+      <div class="lib-actions">
+        <button id="btn-theme-lib" class="btn-icon" title="Tema" aria-label="Tema">◐</button>
+        <label class="btn-icon btn-add" for="file-input" title="Aggiungi libro">+</label>
+        <input type="file" id="file-input" accept=".epub,application/epub+zip" multiple hidden />
+      </div>
+    </header>
+    <p id="lib-count" class="lib-count"></p>
+    <div id="book-grid" class="book-grid"></div>
+    <div id="lib-empty" class="lib-empty hidden">
+      <div class="empty-icon">📚</div>
+      <p>Nessun libro ancora</p>
+      <label class="btn btn-primary" for="file-input">Aggiungi un EPUB</label>
     </div>
   </div>
 
-  <!-- Interfaccia di lettura -->
+  <!-- LETTORE -->
   <div id="reader" class="reader hidden">
-    <!-- Barra superiore -->
     <header class="toolbar">
+      <button id="btn-back" class="btn-icon" title="Libreria" aria-label="Indietro">←</button>
       <button id="btn-toc" class="btn-icon" title="Sommario" aria-label="Sommario">☰</button>
       <div class="book-info">
         <span id="book-title">Titolo</span>
         <span id="book-author" class="author"></span>
       </div>
       <div class="controls">
-        <button id="btn-font-dec" class="btn-icon" title="Riduci testo" aria-label="Riduci testo">A−</button>
-        <button id="btn-font-inc" class="btn-icon" title="Ingrandisci testo" aria-label="Ingrandisci testo">A+</button>
-        <button id="btn-theme" class="btn-icon" title="Cambia tema" aria-label="Cambia tema">◐</button>
-        <button id="btn-open" class="btn-icon" title="Apri altro ebook" aria-label="Apri altro ebook">📂</button>
+        <button id="btn-tts" class="btn-icon" title="Ascolta (TTS)" aria-label="Text to speech">🔊</button>
+        <button id="btn-bookmark" class="btn-icon" title="Aggiungi segnalibro">🔖</button>
+        <button id="btn-bookmarks-list" class="btn-icon" title="Elenco segnalibri">📑</button>
+        <button id="btn-font-dec" class="btn-icon" title="Riduci testo">A−</button>
+        <button id="btn-font-inc" class="btn-icon" title="Ingrandisci testo">A+</button>
+        <button id="btn-theme" class="btn-icon" title="Tema">◐</button>
       </div>
     </header>
-
-    <!-- Contenuto principale -->
     <div class="main">
-      <!-- Sidebar TOC -->
       <aside id="sidebar" class="sidebar">
         <div class="sidebar-header">
-          <h2>Sommario</h2>
+          <h2 id="sidebar-title">Sommario</h2>
           <button id="btn-close-toc" class="btn-icon" aria-label="Chiudi">✕</button>
         </div>
         <nav id="toc" class="toc"></nav>
+        <nav id="bookmarks-panel" class="toc hidden"></nav>
       </aside>
-
-      <!-- Area di lettura -->
       <div class="viewer-wrapper">
         <div id="viewer"></div>
         <div class="nav-overlay">
-          <button id="btn-prev" class="nav-btn prev" title="Pagina precedente" aria-label="Precedente">‹</button>
-          <button id="btn-next" class="nav-btn next" title="Pagina successiva" aria-label="Successiva">›</button>
+          <button id="btn-prev" class="nav-btn prev" aria-label="Precedente">‹</button>
+          <button id="btn-next" class="nav-btn next" aria-label="Successiva">›</button>
         </div>
       </div>
     </div>
-
-    <!-- Barra inferiore -->
     <footer class="status-bar">
-      <button id="btn-prev-mobile" class="btn-nav-mobile" aria-label="Precedente">‹ Prec</button>
+      <button id="btn-prev-mobile" class="btn-nav-mobile">‹ Prec</button>
       <span id="location-info">—</span>
-      <div class="progress-bar">
-        <div id="progress" class="progress"></div>
-      </div>
-      <button id="btn-next-mobile" class="btn-nav-mobile" aria-label="Successiva">Succ ›</button>
+      <div class="progress-bar"><div id="progress" class="progress"></div></div>
+      <button id="btn-next-mobile" class="btn-nav-mobile">Succ ›</button>
     </footer>
   </div>
 
-  <!-- Overlay di caricamento -->
-  <div id="loading" class="loading hidden">
-    <div class="spinner"></div>
-    <p>Caricamento ebook…</p>
+
+  <!-- TTS panel -->
+  <div id="tts-panel" class="tts-panel hidden">
+    <div class="tts-row">
+      <button id="tts-play" class="btn-nav-mobile" title="Play/Pausa">▶</button>
+      <button id="tts-stop" class="btn-nav-mobile" title="Stop">■</button>
+      <label class="tts-label">Velocità
+        <input type="range" id="tts-rate" min="0.5" max="2" step="0.1" value="1" />
+      </label>
+      <select id="tts-voice" class="tts-voice" title="Voce"></select>
+      <button id="tts-close" class="btn-icon" title="Chiudi">✕</button>
+    </div>
   </div>
 
-  <!-- Script -->
+  <div id="loading" class="loading hidden">
+    <div class="spinner"></div>
+    <p id="loading-text">Caricamento…</p>
+  </div>
+  <div id="toast" class="toast hidden"></div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
   <script src="js/app.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js").catch((err) => {
-          console.warn("SW registration failed:", err);
-        });
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
       });
     }
   </script>
