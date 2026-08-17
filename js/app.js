@@ -40,6 +40,7 @@
   let ttsQueue = [];
   let ttsIndex = 0;
   let ttsVoices = [];
+  let ttsDoc = null;  // iframe document for highlighting
 
 
   document.documentElement.setAttribute("data-theme", currentTheme);
@@ -845,12 +846,10 @@
   }
 
   function splitSentences(text) {
-    // Split on sentence boundaries, keep reasonable chunks
     const parts = text
       .split(/(?<=[.!?…])\s+|\n+/)
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
-    // Merge very short fragments
     const merged = [];
     for (const p of parts) {
       if (merged.length && merged[merged.length - 1].length < 40 && p.length < 80) {
@@ -862,33 +861,180 @@
     return merged;
   }
 
+  function getIframeDocument() {
+    try {
+      const iframe = viewer.querySelector("iframe");
+      return iframe?.contentDocument || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function injectHighlightStyle(doc) {
+    if (!doc) return;
+    if (doc.getElementById("tts-highlight-style")) return;
+    const style = doc.createElement("style");
+    style.id = "tts-highlight-style";
+    style.textContent = `
+      .tts-highlight {
+        background: rgba(255, 213, 74, 0.85) !important;
+        color: #111 !important;
+        border-radius: 3px;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+        transition: background 0.15s ease;
+      }
+      [data-theme="dark"] .tts-highlight,
+      .tts-highlight {
+        background: rgba(255, 200, 50, 0.9) !important;
+      }
+    `;
+    (doc.head || doc.documentElement).appendChild(style);
+  }
+
+  function clearTTSHighlight() {
+    const doc = ttsDoc || getIframeDocument();
+    if (!doc) return;
+    doc.querySelectorAll(".tts-highlight").forEach((el) => {
+      const parent = el.parentNode;
+      if (!parent) return;
+      while (el.firstChild) parent.insertBefore(el.firstChild, el);
+      parent.removeChild(el);
+      parent.normalize();
+    });
+  }
+
+  function normalizeForMatch(s) {
+    return s.replace(/\s+/g, " ").trim().toLowerCase();
+  }
+
+  /** Highlight first occurrence of sentence text inside the iframe document */
+  function highlightSentence(sentence) {
+    clearTTSHighlight();
+    const doc = ttsDoc || getIframeDocument();
+    if (!doc || !doc.body || !sentence) return;
+
+    injectHighlightStyle(doc);
+    const target = normalizeForMatch(sentence);
+    if (target.length < 2) return;
+
+    // Collect text nodes
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        const p = node.parentElement;
+        if (p && /^(script|style|noscript)$/i.test(p.tagName)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+
+    const nodes = [];
+    let n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    if (!nodes.length) return;
+
+    // Build full text map with offsets
+    let full = "";
+    const map = []; // { node, start, end }
+    for (const node of nodes) {
+      const t = node.nodeValue.replace(/\s+/g, " ");
+      // keep original for slicing but search on normalized continuous string
+      const start = full.length;
+      full += node.nodeValue;
+      map.push({ node, start, end: full.length });
+    }
+
+    const fullNorm = full.replace(/\s+/g, " ").toLowerCase();
+    // Map normalized index back is hard; search in collapsed form with approximate locate
+    // Simpler approach: search original full with flexible whitespace
+    const pattern = sentence
+      .trim()
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\s+/g, "\\s+");
+    let match;
+    try {
+      match = new RegExp(pattern).exec(full);
+    } catch (_) {
+      match = null;
+    }
+    if (!match) {
+      // fallback: first 40 chars
+      const short = sentence.trim().slice(0, 40).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      try {
+        match = new RegExp(short).exec(full);
+      } catch (_) {}
+    }
+    if (!match) return;
+
+    const matchStart = match.index;
+    const matchEnd = match.index + match[0].length;
+
+    // Find start/end nodes
+    let startNode, startOffset, endNode, endOffset;
+    for (const m of map) {
+      if (startNode == null && matchStart >= m.start && matchStart < m.end) {
+        startNode = m.node;
+        startOffset = matchStart - m.start;
+      }
+      if (matchEnd > m.start && matchEnd <= m.end) {
+        endNode = m.node;
+        endOffset = matchEnd - m.start;
+      }
+    }
+    if (!startNode || !endNode) return;
+
+    try {
+      const range = doc.createRange();
+      range.setStart(startNode, startOffset);
+      range.setEnd(endNode, endOffset);
+      const span = doc.createElement("span");
+      span.className = "tts-highlight";
+      range.surroundContents(span);
+      // Scroll into view
+      span.scrollIntoView({ block: "center", behavior: "smooth" });
+    } catch (err) {
+      // surroundContents fails if range crosses element boundaries – use extractContents
+      try {
+        const range = doc.createRange();
+        range.setStart(startNode, startOffset);
+        range.setEnd(endNode, endOffset);
+        const span = doc.createElement("span");
+        span.className = "tts-highlight";
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
+        span.scrollIntoView({ block: "center", behavior: "smooth" });
+      } catch (e2) {
+        console.warn("highlight failed", e2);
+      }
+    }
+  }
+
   async function getCurrentChapterText() {
+    ttsDoc = getIframeDocument();
     if (!book || !rendition) return "";
     try {
+      if (ttsDoc) return extractTextFromDoc(ttsDoc);
       const loc = rendition.currentLocation();
       const href = loc?.start?.href;
       if (!href) return "";
       const section = book.section(href);
       if (!section) return "";
-      // Load section document
-      const doc = await section.document;
-      if (doc) return extractTextFromDoc(doc);
-      // Fallback: render HTML string
       await section.load();
-      if (section.document) return extractTextFromDoc(section.document);
+      if (section.document) {
+        ttsDoc = section.document;
+        return extractTextFromDoc(section.document);
+      }
     } catch (err) {
       console.warn("TTS text extract:", err);
     }
-    // Last resort: try iframe body
-    try {
-      const iframe = viewer.querySelector("iframe");
-      if (iframe?.contentDocument) return extractTextFromDoc(iframe.contentDocument);
-    } catch (_) {}
+    ttsDoc = getIframeDocument();
+    if (ttsDoc) return extractTextFromDoc(ttsDoc);
     return "";
   }
 
   function speakNext() {
     if (!ttsQueue.length || ttsIndex >= ttsQueue.length) {
+      clearTTSHighlight();
       ttsSpeaking = false;
       ttsPaused = false;
       updateTTSButtons();
@@ -896,6 +1042,8 @@
       return;
     }
     const text = ttsQueue[ttsIndex];
+    highlightSentence(text);
+
     const u = new SpeechSynthesisUtterance(text);
     const voice = getSelectedVoice();
     if (voice) u.voice = voice;
@@ -906,10 +1054,12 @@
     u.onend = () => {
       ttsIndex++;
       if (ttsSpeaking && !ttsPaused) speakNext();
+      else clearTTSHighlight();
     };
     u.onerror = () => {
       ttsIndex++;
       if (ttsSpeaking && !ttsPaused) speakNext();
+      else clearTTSHighlight();
     };
 
     ttsUtterance = u;
@@ -926,6 +1076,8 @@
     }
     stopTTS(false);
     showLoading(true, "Preparazione audio…");
+    ttsDoc = getIframeDocument();
+    injectHighlightStyle(ttsDoc);
     const text = await getCurrentChapterText();
     showLoading(false);
     if (!text || text.length < 5) {
@@ -938,7 +1090,6 @@
     ttsPaused = false;
     $("#tts-panel")?.classList.remove("hidden");
     $("#btn-tts")?.classList.add("tts-active");
-    // Chrome/Edge sometimes need a kick
     speechSynthesis.cancel();
     setTimeout(() => speakNext(), 80);
     showToast("Lettura avviata");
@@ -946,7 +1097,6 @@
 
   function pauseResumeTTS() {
     if (!ttsSpeaking && !ttsPaused && ttsQueue.length) {
-      // restart from current index
       ttsSpeaking = true;
       ttsPaused = false;
       speakNext();
@@ -966,11 +1116,13 @@
 
   function stopTTS(hidePanel = true) {
     try { speechSynthesis.cancel(); } catch (_) {}
+    clearTTSHighlight();
     ttsSpeaking = false;
     ttsPaused = false;
     ttsUtterance = null;
     ttsQueue = [];
     ttsIndex = 0;
+    ttsDoc = null;
     updateTTSButtons();
     if (hidePanel) {
       $("#tts-panel")?.classList.add("hidden");
